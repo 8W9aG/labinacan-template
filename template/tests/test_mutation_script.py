@@ -1,0 +1,348 @@
+"""The wrapper that runs mutmut on a branch's changed files (#5856)."""
+
+from __future__ import annotations
+
+import importlib.util
+import subprocess
+import sys
+import types
+from pathlib import Path
+
+import pytest
+
+
+def _script():
+    path = Path(__file__).resolve().parents[1] / "scripts" / "mutation.py"
+    spec = importlib.util.spec_from_file_location("mutation_script", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+
+@pytest.fixture
+def repo(tmp_path):
+    """A repository with a package file, a script and a test, on a base commit."""
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "config", "user.email", "t@example.org")
+    _git(tmp_path, "config", "user.name", "T")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mutmut]\nsource_paths = ["aproject", "labinacan"]\n'
+        '[tool.labinacan]\nmutation_skip = ["data/big"]\n'
+    )
+    pkg = tmp_path / "aproject" / "core"
+    pkg.mkdir(parents=True)
+    (pkg / "stats.py").write_text("X = 1\n")
+    (pkg / "gone.py").write_text("Y = 1\n")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "tool.py").write_text("Z = 1\n")
+    (tmp_path / "data" / "small").mkdir(parents=True)
+    (tmp_path / "data" / "small" / "a.json").write_text("{}")
+    (tmp_path / "data" / "LICENSE.md").write_text("L")
+    (tmp_path / "data" / "big").mkdir()
+    (tmp_path / "data" / "big" / "b.json").write_text("{}")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "base")
+    return tmp_path
+
+
+def test_changed_files_are_the_branchs_package_files_only(repo):
+    script = _script()
+    _git(repo, "checkout", "-qb", "work")
+    (repo / "aproject" / "core" / "stats.py").write_text("X = 2\n")
+    _git(repo, "commit", "-qam", "committed change")
+    (repo / "aproject" / "core" / "gone.py").unlink()  # deleted: not mutated
+    (repo / "aproject" / "core" / "new.py").write_text("W = 1\n")  # untracked
+    (repo / "scripts" / "tool.py").write_text("Z = 2\n")  # outside the package
+    assert script.changed_files("main", repo) == ["aproject/core/new.py",
+                                                  "aproject/core/stats.py"]  # fmt: skip
+
+
+def test_copied_skips_the_package_tests_and_experiment_records(repo):
+    got = _script().copied(repo)
+    assert "aproject" not in got and "data/big" not in got
+    assert "scripts" in got and "data" not in got
+    assert got.index("data/small") < got.index("data/LICENSE.md")  # folders before files
+
+
+def test_imports_finds_the_module_however_a_test_imports_it():
+    script = _script()
+    module = "aproject.core.stats"
+    assert script.imports("import aproject.core.stats as s", module)
+    assert script.imports("from aproject.core import (\n    schemas,\n    stats,\n)",
+                          module)  # fmt: skip
+    assert not script.imports("from aproject.core import statsmodels", module)
+    assert not script.imports("from aproject.agents import stats", module)
+
+
+def test_tests_for_selects_the_tests_that_import_a_changed_file(tmp_path):
+    script = _script()
+    (tmp_path / "test_a.py").write_text("from aproject.core import stats\n")
+    (tmp_path / "test_b.py").write_text("from aproject.core import schemas\n")
+    (tmp_path / "helper.py").write_text("import aproject.core.stats\n")  # not a test
+    got = script.tests_for(["aproject/core/stats.py"], tmp_path)
+    assert got == [str(tmp_path / "test_a.py")]
+
+
+def _fake_mutmut(monkeypatch, results: str, calls: list):
+    """Stand-ins for mutmut's configuration and command line."""
+    configuration = types.ModuleType("mutmut.configuration")
+    configuration._config_reader = lambda: lambda key, default: f"file:{key}"
+    configuration.reset_config = lambda: calls.append("reset")
+    main = types.ModuleType("mutmut.__main__")
+
+    def cli(args, standalone_mode):
+        calls.append(args)
+        if args == ["results"]:
+            print(results)
+
+    main.cli = cli
+    _script()  # imports repo_config, beside it in scripts/
+    monkeypatch.setattr(sys.modules["repo_config"], "verdict_code", lambda root=None: ("a.py",))
+    package = types.ModuleType("mutmut")
+    monkeypatch.setitem(sys.modules, "mutmut", package)
+    monkeypatch.setitem(sys.modules, "mutmut.configuration", configuration)
+    monkeypatch.setitem(sys.modules, "mutmut.__main__", main)
+    return configuration
+
+
+def test_override_replaces_only_the_three_keys(monkeypatch):
+    calls: list = []
+    configuration = _fake_mutmut(monkeypatch, "", calls)
+    _script().override(["a.py"], ["tests/test_a.py"], ["scripts"])
+    read = configuration._config_reader()
+    assert read("only_mutate", []) == ["a.py"] and read("also_copy", []) == ["scripts"]
+    assert read("pytest_add_cli_args_test_selection", []) == ["tests/test_a.py"]
+    assert read("source_paths", []) == "file:source_paths" and calls == ["reset"]
+
+
+def test_main_fails_on_a_surviving_mutant(monkeypatch, capsys):
+    calls: list = []
+    _fake_mutmut(monkeypatch, "    m__mutmut_1: survived\n    m__mutmut_2: killed", calls)
+    assert _script().main([]) == 1
+    assert calls == [["run"], ["results"]]
+    assert capsys.readouterr().out.strip() == "m__mutmut_1: survived"
+
+
+def test_main_with_no_verdict_code_mutates_nothing(monkeypatch, capsys):
+    calls: list = []
+    _fake_mutmut(monkeypatch, "", calls)
+    monkeypatch.setattr(sys.modules["repo_config"], "verdict_code", lambda root=None: ())
+    assert _script().main([]) == 0
+    assert calls == []
+    assert capsys.readouterr().out == (
+        "No verdict code in [tool.mutmut] only_mutate yet: nothing to mutate.\n"
+    )
+
+
+def test_main_passes_with_no_survivor(monkeypatch, capsys):
+    _fake_mutmut(monkeypatch, "", [])
+    assert _script().main([]) == 0
+    assert "No mutant survived." in capsys.readouterr().out
+
+
+def test_main_with_a_base_mutates_the_changed_files(monkeypatch, capsys):
+    calls: list = []
+    configuration = _fake_mutmut(monkeypatch, "", calls)
+    script = _script()
+    monkeypatch.setattr(script, "changed_files", lambda base: ["aproject/x.py"])
+    monkeypatch.setattr(script, "tests_for", lambda paths: ["tests/test_x.py"])
+    monkeypatch.setattr(script, "copied", lambda: ["scripts"])
+    monkeypatch.setattr(script, "selected", lambda paths, base: (["x.x_f__mutmut_1"], 7))
+    assert script.main(["--base", "origin/main"]) == 0
+    out = capsys.readouterr().out
+    assert "Mutating 1 files with 1 test files" in out and "Running 1 of the 7 mutants" in out
+    assert ["run", "x.x_f__mutmut_1"] in calls
+    assert configuration._config_reader()("only_mutate", []) == ["aproject/x.py"]
+    script.main(["--base", "origin/main", "show", "m"])  # a command runs under the selection
+    assert calls[-1] == ["show", "m"]
+
+
+def test_main_with_no_change_does_nothing(monkeypatch, capsys):
+    calls: list = []
+    _fake_mutmut(monkeypatch, "", calls)
+    script = _script()
+    monkeypatch.setattr(script, "changed_files", lambda base: [])
+    assert script.main(["--base", "origin/main"]) == 0
+    assert calls == [] and "nothing to mutate" in capsys.readouterr().out
+
+
+def test_changed_lines_are_the_branchs_added_and_changed_lines(repo):
+    m = _script()
+    stats = repo / "aproject" / "core" / "stats.py"
+    stats.write_text("X = 1\nY = 2\nZ = 3\n")
+    _git(repo, "commit", "-qam", "more")
+    _git(repo, "checkout", "-qb", "work")
+    stats.write_text("X = 1\nY = 20\nZ = 3\n")  # uncommitted counts too
+    assert m.changed_lines("main", "aproject/core/stats.py", repo) == {2}
+    stats.write_text("X = 1\nZ = 3\n")  # a deletion marks the line after it
+    assert m.changed_lines("main", "aproject/core/stats.py", repo) == {2}
+    new = repo / "aproject" / "core" / "new.py"
+    new.write_text("A = 1\n")
+    assert m.changed_lines("main", "aproject/core/new.py", repo) is None
+
+
+def test_selected_runs_only_the_changed_functions_mutants_and_caps_them(repo, monkeypatch):
+    m = _script()
+    stats = repo / "aproject" / "core" / "stats.py"
+    stats.write_text("def f():\n    return 1\n\n\ndef g():\n    return 2\n")
+    _git(repo, "commit", "-qam", "functions")
+    _git(repo, "checkout", "-qb", "work")
+    stats.write_text("def f():\n    return 1\n\n\ndef g():\n    return 3\n")
+    names = [f"x_{fn}__mutmut_{i}" for fn in "fg" for i in range(1, 4)]
+    mutation = types.ModuleType("mutmut.mutation.file_mutation")
+    mutation.mutate_file_contents = lambda path, source: types.SimpleNamespace(mutant_names=names)
+    utils = types.ModuleType("mutmut.utils.format_utils")
+    utils.get_mutant_name = lambda path, name: f"{str(path)[:-3].replace('/', '.')}.{name}"
+    monkeypatch.setitem(sys.modules, "mutmut.mutation.file_mutation", mutation)
+    monkeypatch.setitem(sys.modules, "mutmut.utils.format_utils", utils)
+    keys, total = m.selected(["aproject/core/stats.py"], "main", repo)
+    assert total == 3 and all(".x_g__mutmut_" in k for k in keys)
+    monkeypatch.setattr(m, "CAP", 2)
+    assert m.sample(keys, cap=m.CAP) == m.sample(keys, cap=2) and len(m.sample(keys, cap=2)) == 2
+
+
+def test_main_with_no_mutant_in_the_changed_functions_runs_nothing(monkeypatch, capsys):
+    calls: list = []
+    _fake_mutmut(monkeypatch, "", calls)
+    script = _script()
+    monkeypatch.setattr(script, "changed_files", lambda base: ["aproject/x.py"])
+    monkeypatch.setattr(script, "tests_for", lambda paths: [])
+    monkeypatch.setattr(script, "copied", lambda: [])
+    monkeypatch.setattr(script, "selected", lambda paths, base: ([], 0))
+    assert script.main(["--base", "origin/main"]) == 0
+    assert "nothing to run" in capsys.readouterr().out and not any(
+        c[:1] == ["run"] for c in calls if isinstance(c, list)
+    )
+
+
+def test_function_spans_name_functions_as_mutmut_names_their_mutants():
+    # The selection matches mutmut's mutant names to these, so a renaming in a new mutmut
+    # version would make it run nothing. mutmut is in the dev group (#5857).
+    from mutmut.mutation.file_mutation import mutate_file_contents
+
+    source = (
+        "def f(a):\n    return a + 1\n\n\nclass C:\n    def m(self, b):\n        return b * 2\n"
+    )
+    names = mutate_file_contents("pkg/mod.py", source).mutant_names
+    spans = _script().function_spans(source)
+    assert names and {n.partition("__mutmut_")[0] for n in names} == set(spans)
+
+
+def test_a_moved_file_counts_only_the_lines_it_changed(repo):
+    # #6628: a module that moves to labinacan/ is not new code.
+    m = _script()
+    stats = repo / "aproject" / "core" / "stats.py"
+    stats.write_text("".join(f"V{i} = {i}\n" for i in range(12)))
+    _git(repo, "commit", "-qam", "longer")
+    _git(repo, "checkout", "-qb", "move")
+    (repo / "labinacan").mkdir()
+    _git(repo, "mv", "aproject/core/stats.py", "labinacan/stats.py")
+    moved = repo / "labinacan" / "stats.py"
+    moved.write_text(moved.read_text().replace("V3 = 3", "V3 = 30"))
+    _git(repo, "add", "labinacan/stats.py")
+    merge_base = m._git(repo, "merge-base", "main", "HEAD")[0]
+    assert m.renamed_from(merge_base, "labinacan/stats.py", repo) == ["aproject/core/stats.py"]
+    assert m.renamed_from(merge_base, "scripts/tool.py", repo) == []
+    assert m.changed_lines("main", "labinacan/stats.py", repo) == {4}
+    assert "labinacan/stats.py" in m.changed_files("main", repo)
+
+
+def test_a_file_moved_with_a_new_module_at_its_old_path_counts_only_its_edits(repo):
+    # #6628: builder/css.py moved to labinacan/, and a thin entry point took its place.
+    m = _script()
+    stats = repo / "aproject" / "core" / "stats.py"
+    stats.write_text("".join(f"V{i} = {i}\n" for i in range(12)))
+    _git(repo, "commit", "-qam", "longer")
+    _git(repo, "checkout", "-qb", "move")
+    (repo / "labinacan").mkdir()
+    moved = repo / "labinacan" / "stats.py"
+    moved.write_text(stats.read_text().replace("V3 = 3", "V3 = 30"))
+    stats.write_text("from labinacan.stats import V1\n")
+    _git(repo, "add", "labinacan/stats.py", "aproject/core/stats.py")
+    merge_base = m._git(repo, "merge-base", "main", "HEAD")[0]
+    assert m.renamed_from(merge_base, "labinacan/stats.py", repo) == ["aproject/core/stats.py"]
+    assert m.changed_lines("main", "labinacan/stats.py", repo) == {4}
+
+
+def test_an_order_seed_adds_pytest_randomly_to_the_test_arguments(monkeypatch):
+    calls: list = []
+    configuration = _fake_mutmut(monkeypatch, "", calls)
+    configuration._config_reader = lambda: (
+        lambda key, default: ["-q"] if key == "pytest_add_cli_args" else f"file:{key}"
+    )
+    script = _script()
+    assert script.main(["--order-seed", "3"]) == 0
+    read = configuration._config_reader()
+    assert read("pytest_add_cli_args", []) == ["-q", "-p", "randomly", "--randomly-seed=3"]
+    assert read("only_mutate", []) == "file:only_mutate"
+    assert calls[-2:] == [["run"], ["results"]]
+
+
+def test_main_with_runs_repeats_and_runs_no_mutmut_itself(monkeypatch):
+    script = _script()
+    seen = []
+    monkeypatch.setattr(script, "repeat", lambda *args: seen.append(args) or 7)
+    assert script.main(["--base", "main", "--runs", "5"]) == 7
+    assert script.main(["--runs", "2"]) == 7
+    path = Path(script.__file__)
+    assert seen == [(5, "main", path, script.FAILING), (2, None, path, script.FAILING)]
+
+
+def _repeat(monkeypatch, tmp_path, results):
+    """Run :func:`repeat` with each run's ``mutmut results --all true`` taken from ``results``."""
+    script = _script()
+    commands = []
+
+    def run(command, **kwargs):
+        assert command[1] == "m.py"
+        commands.append((command[2:], kwargs["cwd"]))
+        seed = int(command[command.index("--order-seed") + 1])
+        assert not (tmp_path / "mutants").exists()  # each run starts clean
+        return types.SimpleNamespace(stdout=results[seed - 1] if "results" in command else "")
+
+    monkeypatch.setattr(script.subprocess, "run", run)
+    (tmp_path / "mutants").mkdir()
+    status = script.repeat(len(results), "main", Path("m.py"), script.FAILING, tmp_path)
+    return status, commands
+
+
+def test_repeated_runs_with_the_same_results_pass(monkeypatch, tmp_path, capsys):
+    same = "    a__mutmut_1: killed\n    a__mutmut_2: killed\n"
+    status, commands = _repeat(monkeypatch, tmp_path, [same, same])
+    assert status == 0
+    assert [c for c, _ in commands] == [
+        ["--base", "main", "--order-seed", "1"],
+        ["--base", "main", "--order-seed", "1", "results", "--all", "true"],
+        ["--base", "main", "--order-seed", "2"],
+        ["--base", "main", "--order-seed", "2", "results", "--all", "true"],
+    ]
+    assert all(cwd == tmp_path for _, cwd in commands)
+    out = capsys.readouterr().out
+    assert "Run 1 (--randomly-seed=1): 2 mutants, 2 killed" in out
+    assert "No mutant failed in 2 runs." in out
+    assert "No mutant changed its result between runs." in out
+
+
+def test_a_mutant_that_survives_one_run_is_reported_and_fails(monkeypatch, tmp_path, capsys):
+    killed = "    a__mutmut_1: killed\n    a__mutmut_2: killed\n"
+    survived = "    a__mutmut_1: survived\n    a__mutmut_2: killed\n"
+    status, _ = _repeat(monkeypatch, tmp_path, [killed, survived])
+    out = capsys.readouterr().out
+    assert status == 1
+    assert "run 2: a__mutmut_1: survived" in out and "a__mutmut_1: killed, survived" in out
+    assert "Run 2 (--randomly-seed=2): 2 mutants, 1 killed, 1 survived" in out
+
+
+def test_a_run_with_no_results_fails(monkeypatch, tmp_path, capsys):
+    status, _ = _repeat(monkeypatch, tmp_path, ["    a__mutmut_1: killed\n", ""])
+    out = capsys.readouterr().out
+    assert status == 1 and "no results" in out and "a__mutmut_1: killed, missing" in out
+
+
+def test_a_failing_mutant_in_every_run_fails_although_it_never_changes(monkeypatch, tmp_path):
+    timeout = "    a__mutmut_1: timeout\n"
+    assert _repeat(monkeypatch, tmp_path, [timeout, timeout])[0] == 1

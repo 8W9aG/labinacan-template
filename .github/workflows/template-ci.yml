@@ -1,0 +1,76 @@
+# The template's CI (8W9aG/openinterpretability#7002). It copies the project with copier's
+# default answers and runs the project's own checks on the copy, as its first push would.
+# Then it checks that `copier update` takes a later change of the template cleanly.
+name: Template CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COPIER: copier==9.19.1
+
+jobs:
+  copy:
+    name: A default copy passes its checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # copier reads the template's commits
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
+      - name: Copy the project with the default answers
+        # github_setup=false: CI changes no repository. The task still draws the brand.
+        run: |
+          uvx "$COPIER" copy --defaults --trust -d github_setup=false --vcs-ref HEAD \
+            . "$RUNNER_TEMP/project"
+          cd "$RUNNER_TEMP/project"
+          git init --quiet
+          git add -A
+          git -c user.name=ci -c user.email=ci@example.org commit --quiet -m "copier copy"
+      - name: Install the copy's dependencies (its scripts/ci-install.sh)
+        working-directory: ${{ runner.temp }}/project
+        run: |
+          ./scripts/ci-install.sh
+          echo "$RUNNER_TEMP/project/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install Vale
+        # The release binary that the project's own CI pins and checks.
+        env:
+          VALE_VERSION: 3.26.0
+          VALE_SHA256: 22aa69a556558e4a9dfc63c17030777383d8d3c48dcdfad655fa98e839d666ed
+        run: |
+          tarball="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl -sSfL --retry 5 --retry-delay 5 -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/$tarball"
+          echo "$VALE_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/vale"
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/vale" vale
+          echo "$RUNNER_TEMP/vale" >> "$GITHUB_PATH"
+      - name: Lint, tests with coverage, and the site
+        working-directory: ${{ runner.temp }}/project
+        env:
+          UV_NO_SYNC: "1"  # keep the packages that ci-install.sh put in .venv
+        run: |
+          make lint
+          make coverage COVERAGE_BASE=HEAD
+          make mutation
+          make build
+          test -f dist/index.html && test -f dist/assets/mark.svg
+
+  update:
+    name: copier update takes a later change
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
+      - name: Copy, change the template, update
+        run: uvx --from "$COPIER" bash ci/check_update.sh
