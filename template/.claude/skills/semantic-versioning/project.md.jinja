@@ -1,0 +1,25 @@
+# This project's surfaces
+
+The `semantic-versioning` skill reads this file. List the project's public surfaces here as they grow.
+
+The package version is `{{ package }}.__version__`.
+
+## The surfaces
+
+A change is **breaking** when it breaks one of these for a user of the project:
+
+- **The Python API.** A public name in `{{ package }}` is removed or renamed, or its signature changes in an incompatible way.
+- **The records.** A field of a record that the project publishes is removed or renamed, or its meaning changes.
+
+The site, the config and the Make targets come from labinacan and the template. A change to them comes in through a new pin of `labinacan` or `copier update`, not in this project's code.
+
+## How each one changed
+
+```bash
+last=$(git describe --tags --abbrev=0)
+git diff "$last" -- {{ package }}
+```
+
+## This project's own check
+
+None.

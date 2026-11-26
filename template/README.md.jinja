@@ -1,0 +1,67 @@
+# {{ name }}
+
+{{ description }}
+
+{{ name }} started from [labinacan-template](https://github.com/8W9aG/labinacan-template). Its site, papers, posts, literature review and brand come from the [labinacan](https://pypi.org/project/labinacan/) package, which it installs from PyPI. Its own code lives in `{{ package }}/`.
+
+## Develop
+
+```bash
+make install    # the locked dependencies, with the dev group
+make lint       # the checks of code and prose
+make test
+make build      # the site, in dist/
+make serve
+```
+
+## First steps
+
+`copier copy` set up this project from its answers, which `.copier-answers.yml` keeps. Its task drew the brand and, if you asked, set up the GitHub repository with `gh`. It printed what it couldn't do. Run it again at any time with `uv run python scripts/setup_repo.py`.
+
+1. **Commit the lock.** The task wrote `uv.lock`. CI installs from it.
+2. **Set the secrets** that the task listed, with `gh secret set <NAME>`.
+3. **Write the project's part of each skill.** A skill that has a `project.md` beside its `SKILL.md` reads it first. The release's own steps, the breaking surfaces and the priorities of issues are examples.
+4. **Remove the example's content:** the sample paper in `papers/`, the post in `posts/` and the review in `docs/literature/`. Write your own.
+
+`scripts/check_leftovers.py` finds words of another project in the files. Put the words of the project that you came from in `scripts/leftover_terms.txt`.
+
+## Take the template's changes
+
+```bash
+uvx copier update --trust
+```
+
+copier merges each later change of the template into this project, and keeps the project's own changes. It shows a conflict as one in Git. A new release of `labinacan` comes in the same way, as a new pin in `pyproject.toml`.
+
+## The config
+
+`[tool.labinacan]` in `pyproject.toml` holds the project's values:
+
+| Key | What it is |
+| --- | --- |
+| `name` | the project's name as people read it |
+| `package` | its Python package, which holds `__version__` and the brand |
+| `env_prefix` | the prefix of its environment variables |
+| `linear_team` | the Linear team that mirrors its issues |
+| `maintainer` | the maintainer's GitHub login, whose issues agents may work |
+| `hf_dataset` | the Hugging Face dataset of the inputs that its papers cite |
+| `generated` | the files that a tool writes, which the checks of hand-written files skip |
+| `data_only` | the folders whose changes alone run no lint and tests |
+| `automatic_issue_workflows` | the workflows whose failure issues an agent may work |
+
+`[tool.labinacan.brand]` draws the mark, the logo and the social card, and gives the site's accent. After a change, draw them again with `uv run python scripts/brand_images.py`. `[tool.labinacan.size_budget]`, `[tool.labinacan.exchange]` and `[tool.labinacan.breaking]` are optional.
+
+## Layout
+
+| Path | What it holds |
+| --- | --- |
+| `{{ package }}/` | the project's own code, and its brand |
+| `labinacan.mk` | the Make targets that the `Makefile` includes |
+| `scripts/` | the checks of code and prose, the changelog, mutation testing, the issue loop and Linear sync |
+| `.claude/skills/` | the skills that agents follow |
+| `.github/workflows/` | CI, the secret scan, the link check, publishing and issue syncs |
+| `papers/`, `posts/`, `docs/literature/` | the project's content |
+
+## Licence
+
+MIT. See `LICENSE`.

@@ -1,0 +1,2 @@
+# Module files that still have public functions with no doctest (tests/test_doctests.py,
+# #5356). The list only shrinks: when a file has every doctest, delete its line.

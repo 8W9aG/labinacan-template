@@ -1,8 +1,0 @@
-# Public functions that can't have a doctest that runs offline, each with the reason
-# (tests/test_doctests.py, #5356). One per line: path::Qualified.name  reason
-labinacan/social/poster.py::XPoster.post  sends a request to X's API
-labinacan/social/poster.py::XPoster.upload  downloads a figure and sends it to X's API
-labinacan/site/build.py::build  renders the configured project's whole site, every literature review included; tests/test_labinacan_build.py builds a small project
-labinacan/site/build.py::main  builds the site from the command line, as build does; tests/test_labinacan_build.py runs it on a small project
-labinacan/site/github.py::open_prs  runs the gh CLI against GitHub
-labinacan/site/github.py::get_json  reads GitHub's API over the network

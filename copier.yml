@@ -1,0 +1,127 @@
+# The questions that set up a new project (8W9aG/openinterpretability#7002).
+#
+#   copier copy gh:8W9aG/labinacan-template my-project
+#   copier update          # later, in the project, to take the template's changes
+#
+# The answers write [project] and [tool.labinacan] of the project's pyproject.toml, and
+# .copier-answers.yml keeps them for `copier update`. The defaults give labinacan's own
+# brand: the can, in teal.
+
+_subdirectory: template
+_min_copier_version: "9.4"
+_answers_file: .copier-answers.yml
+_skip_if_exists:
+  # The project's content: an update never overwrites what the project has written.
+  - CHANGELOG.md
+  - "{{ package }}/brand/mark-32.png"
+  - "{{ package }}/brand/og.png"
+
+name:
+  type: str
+  help: The project's name, as people read it
+  default: Example Project
+  validator: "{% if not name.strip() %}Give the project a name{% endif %}"
+
+slug:
+  type: str
+  help: The repository's name, and the distribution's name on PyPI
+  default: "{{ name | lower | replace(' ', '-') }}"
+  validator: >-
+    {% if not (slug | regex_search('^[a-z0-9][a-z0-9-]*$')) %}Use lower-case letters,
+    digits and hyphens{% endif %}
+
+package:
+  type: str
+  help: The project's Python package, which holds __version__ and the brand
+  default: "{{ slug | replace('-', '_') }}"
+  validator: >-
+    {% if not (package | regex_search('^[a-z_][a-z0-9_]*$')) %}Use a Python name: lower-case
+    letters, digits and underscores{% elif package == 'labinacan' %}labinacan is the package
+    that the project installs: choose another name{% endif %}
+
+description:
+  type: str
+  help: One sentence on what the project studies
+  default: An agent-run research project.
+
+env_prefix:
+  type: str
+  help: The prefix of the project's environment variables
+  default: "{{ package | upper }}"
+  validator: "{% if not (env_prefix | regex_search('^[A-Z][A-Z0-9_]*$')) %}Use capitals, digits and underscores{% endif %}"
+
+maintainer:
+  type: str
+  help: The maintainer's GitHub login. Agents work only the maintainer's issues
+  default: your-github-login
+
+author:
+  type: str
+  help: The maintainer's name, the first author of each paper
+  default: "{{ maintainer }}"
+
+email:
+  type: str
+  help: The project's contact email
+  default: contact@example.org
+
+repo:
+  type: str
+  help: The GitHub repository, as owner/name
+  default: "{{ maintainer }}/{{ slug }}"
+
+site_url:
+  type: str
+  help: The site's address
+  default: https://example.org/
+
+linear_team:
+  type: str
+  help: The key of the Linear team that mirrors the issues
+  default: "{{ slug.replace('-', '')[:3] | upper }}"
+
+hf_dataset:
+  type: str
+  help: The Hugging Face dataset of the inputs that the papers cite
+  default: "{{ maintainer }}/{{ slug }}-inputs"
+
+tile:
+  type: str
+  help: "The brand: the colour of the mark's tile"
+  default: "#0F172A"
+
+lid:
+  type: str
+  help: "The brand: the colour of the mark's top row"
+  default: "#94A3B8"
+
+side:
+  type: str
+  help: "The brand: the colour of the mark's sides"
+  default: "#2DD4BF"
+
+label:
+  type: str
+  help: "The brand: the colour of the mark's middle column"
+  default: "#F59E0B"
+
+accent:
+  type: str
+  help: "The site's accent, for links and highlights: a Tailwind palette"
+  choices: [teal, sky, indigo, emerald, rose, amber]
+  default: teal
+
+github_setup:
+  type: bool
+  help: >-
+    After the copy, set up the GitHub repository with gh: labels, description and
+    homepage? The repository must exist, and gh must be logged in
+  default: true
+
+_tasks:
+  # Once, after the first copy: draw the brand and set up the repository. An update runs
+  # nothing, so it never changes the repository's settings.
+  - command: [uv, run, --quiet, python, scripts/setup_repo.py]
+    when: "{{ _copier_operation == 'copy' and github_setup }}"
+  - command: [uv, run, --quiet, python, scripts/setup_repo.py, --brand-only]
+    when: "{{ _copier_operation == 'copy' and not github_setup }}"
