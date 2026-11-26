@@ -1,0 +1,9 @@
+{"measure": "commits", "value": 186, "note": "the history that the cut kept, back to 2026-10-18"}
+{"measure": "package_modules", "value": 45, "note": "Python files under labinacan/"}
+{"measure": "templates", "value": 14, "note": "Jinja templates under labinacan/site/templates/"}
+{"measure": "scripts", "value": 29, "note": "Python and shell files under scripts/"}
+{"measure": "skills", "value": 11, "note": "SKILL.md files under .claude/skills/"}
+{"measure": "workflows", "value": 8, "note": "files under .github/workflows/"}
+{"measure": "test_files", "value": 29, "note": "tests/test_*.py"}
+{"measure": "lint_steps", "value": 19, "note": "commands in labinacan.mk's lint target"}
+{"measure": "tests_passed", "value": 314, "note": "pytest; 2 skip, as the example has no trusted workflow and no package of its own"}

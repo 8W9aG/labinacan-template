@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 40" role="img" aria-label="labinacan">
+  <style>.name { fill: #0F172A; } @media (prefers-color-scheme: dark) { .name { fill: #F8FAFC; } }</style>
+  <g transform="translate(4 4)">
+    <rect width="32" height="32" rx="7" fill="#0F172A"/>
+    <rect x="5" y="5" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="5" y="5" width="6" height="6" rx="1" fill="#94A3B8"/>
+    <rect x="13" y="5" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="13" y="5" width="6" height="6" rx="1" fill="#94A3B8"/>
+    <rect x="21" y="5" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="21" y="5" width="6" height="6" rx="1" fill="#94A3B8"/>
+    <rect x="5" y="13" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="5" y="15" width="6" height="4" rx="1" fill="#2DD4BF"/>
+    <rect x="13" y="13" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="13" y="13" width="6" height="6" rx="1" fill="#F59E0B"/>
+    <rect x="21" y="13" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="21" y="15" width="6" height="4" rx="1" fill="#2DD4BF"/>
+    <rect x="5" y="21" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="5" y="23" width="6" height="4" rx="1" fill="#2DD4BF"/>
+    <rect x="13" y="21" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="13" y="21" width="6" height="6" rx="1" fill="#F59E0B"/>
+    <rect x="21" y="21" width="6" height="6" rx="1" fill="#ffffff" fill-opacity="0.16"/>
+    <rect x="21" y="23" width="6" height="4" rx="1" fill="#2DD4BF"/>
+  </g>
+  <text x="48" y="28" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="21" font-weight="600" class="name">labinacan</text>
+</svg>

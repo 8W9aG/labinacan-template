@@ -1,0 +1,9 @@
+# Research questions
+
+The questions that the project's papers answer. Each paper links the question it bears on, and updates its *So far* line.
+
+## 0. Can a new research project start from the template in a day?
+
+A new project copies the template, names itself, and adds its own research code. The question is how much of the rest it can use as it is.
+
+*So far (2026-11-26):* the template's checks pass on it alone, with no file of its first project's field ([What the template holds](../papers/what-the-template-holds/README.md)).

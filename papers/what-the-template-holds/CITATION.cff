@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: If you use this paper, please cite it as below.
+type: article
+title: What the template holds
+authors:
+- given-names: Will
+  family-names: Sackfield
+- name: labinacan
+date-released: '2026-11-26'
+version: preprint
+url: https://github.com/8W9aG/labinacan/research/what-the-template-holds/index.html
+repository-code: https://github.com/8W9aG/labinacan

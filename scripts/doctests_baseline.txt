@@ -1,0 +1,23 @@
+# Module files that still have public functions with no doctest (tests/test_doctests.py,
+# #5356). The list only shrinks: when a file has every doctest, delete its line.
+labinacan/site/changelog_page.py
+labinacan/site/cluster_map.py
+labinacan/site/contents.py
+labinacan/site/css.py
+labinacan/site/disk_memo.py
+labinacan/site/literature_map_view.py
+labinacan/site/literature_pages.py
+labinacan/site/maths.py
+labinacan/site/paper_pdf.py
+labinacan/site/parallel.py
+labinacan/site/pii.py
+labinacan/site/research.py
+labinacan/site/research_feeds.py
+labinacan/site/sections.py
+labinacan/cli.py
+labinacan/site/takedowns.py
+labinacan/figures/motion.py
+labinacan/figures/svg.py
+labinacan/progress.py
+labinacan/sensitive.py
+labinacan/sync/r2.py

@@ -1,0 +1,5 @@
+# Papers
+
+Each folder holds one paper. `README.md` is the paper and `results.jsonl` is its recorded output. The site's Research section publishes the papers listed here, newest first, by the date before each one: the day it was first published. The `write-paper` skill describes how to write one.
+
+- 2026-11-26: [What the template holds](what-the-template-holds/README.md)

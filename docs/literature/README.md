@@ -1,0 +1,15 @@
+# Literature review
+
+One page per paper or post. Each has its citation, a summary written from the source, and a separate discussion of how this project can or can't use it. The `literature-review` skill gives the procedure and the form of a page.
+
+The statuses:
+
+- **used**: code, a skill or a rule depends on it.
+- **planned**: an open issue would use it.
+- **not applicable**: reviewed, and the project has no use for it.
+
+## Releases
+
+| Page | Status | Why |
+| --- | --- | --- |
+| [Semantic Versioning 2.0.0](semantic-versioning.md) (Preston-Werner, 2013) | used | The release's version rule. `scripts/changelog.py next` bumps the minor number for a breaking change while the version is 0.y.z, as the specification allows. |

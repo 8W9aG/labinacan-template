@@ -1,0 +1,15 @@
+# How to cite labinacan. GitHub shows it as "Cite this repository".
+cff-version: 1.2.0
+message: >-
+  If you use the labinacan template or its package, please cite it as below.
+title: "labinacan: the template of an agent-run research project"
+type: software
+authors:
+  - given-names: Will
+    family-names: Sackfield
+repository-code: "https://github.com/8W9aG/labinacan"
+license: MIT
+abstract: >-
+  labinacan is the part of an agent-run research project that doesn't depend on what it
+  studies: the site, papers, posts and literature review, the checks of code and prose,
+  the release, and the skills that agents follow to work the project's issues.
