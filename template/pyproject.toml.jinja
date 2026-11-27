@@ -17,7 +17,12 @@ license-files = ["LICENSE"]
 authors = [{ name = "{{ author }}" }]
 maintainers = [{ name = "{{ name }}", email = "{{ email }}" }]
 requires-python = ">=3.11"
-classifiers = ["Programming Language :: Python :: 3"]
+classifiers = [
+{%- if not pypi %}
+    "Private :: Do Not Upload",  # a local project: PyPI refuses an upload
+{%- endif %}
+    "Programming Language :: Python :: 3",
+]
 dependencies = [
     # The site, papers, posts and brand, from PyPI (8W9aG/labinacan). `copier update`
     # moves this pin when the template moves to a new release.

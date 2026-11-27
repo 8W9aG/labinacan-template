@@ -118,6 +118,20 @@ examples:
     the project starts with empty papers/, posts/ and docs/literature/
   default: false
 
+pypi:
+  type: bool
+  help: >-
+    Publish the package to PyPI on each release? Without it the project stays local: it has
+    no publish workflow, and a classifier makes PyPI refuse an upload
+  default: true
+
+zenodo:
+  type: bool
+  help: >-
+    Does Zenodo archive each GitHub release and give it a DOI? Without it the release skill
+    doesn't check for a Zenodo record. Zenodo can't archive a private repository
+  default: true
+
 github_setup:
   type: bool
   help: >-
