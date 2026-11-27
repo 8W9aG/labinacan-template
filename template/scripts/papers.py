@@ -282,6 +282,12 @@ def abstract(text: str) -> str:
     return " ".join(body.split("\n\n", 1)[0].split())
 
 
+def doi_link() -> list[str]:
+    """The project's DOI link, or none: a project that Zenodo doesn't archive has no DOI."""
+    doi = yaml.safe_load((ROOT / "CITATION.cff").read_text(encoding="utf-8")).get("doi")
+    return [f"https://doi.org/{doi}"] if doi else []
+
+
 def submission(folder: Path) -> str:
     """The text of ``submission.md``: each field of alphaXiv's form for one paper.
 
@@ -294,11 +300,10 @@ def submission(folder: Path) -> str:
     text = (folder / "README.md").read_text(encoding="utf-8")
     paper = _read_paper(folder, REPO)
     names = [a.get("name") or f"{a['given-names']} {a['family-names']}" for a in authors()]
-    doi = yaml.safe_load((ROOT / "CITATION.cff").read_text(encoding="utf-8"))["doi"]
     files = sorted(p.name for p in folder.glob("results*.jsonl"))
     links = [f"{SITE}{folder.name}/index.html", f"{REPO}/tree/main/papers/{folder.name}",
              *(f"{REPO}/blob/main/papers/{folder.name}/{f}" for f in files),
-             *sorted(set(DATASET.findall(text))), f"https://doi.org/{doi}"]  # fmt: skip
+             *sorted(set(DATASET.findall(text))), *doi_link()]  # fmt: skip
     lines = [
         f"# alphaXiv AI Track submission: {folder.name}",
         "",

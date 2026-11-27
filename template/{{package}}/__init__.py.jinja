@@ -1,4 +1,6 @@
-"""{{ name }}: {{ description }}
+"""The {{ name }} package.
+
+{{ (description if description.endswith('.') else description ~ '.') | wordwrap(88) }}
 
 The project's own code lives in this package, beside the ``labinacan`` package that it
 installs from PyPI. ``brand/`` holds the mark, the logo and the social image, which
