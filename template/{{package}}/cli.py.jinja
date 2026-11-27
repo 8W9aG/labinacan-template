@@ -1,0 +1,19 @@
+"""The project's command line: ``{{ slug }}``, with labinacan's site commands.
+
+The deploy workflow runs ``{{ slug }} deploy`` to sync the built site to Cloudflare R2, and
+``{{ slug }} social`` to post new papers. Both come from ``labinacan.cli.site_commands``.
+Add the project's own commands to :func:`main`.
+"""
+
+import click
+from labinacan.cli import site_commands
+from labinacan.config import env, site_url
+
+
+@click.group()
+def main() -> None:
+    """{{ name }}: the site's deploy and social commands."""
+
+
+for _command in site_commands(env("SITE_URL"), site_url):
+    main.add_command(_command)
