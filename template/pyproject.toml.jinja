@@ -33,6 +33,10 @@ dependencies = [
 Homepage = "{{ site_url }}"
 Repository = "https://github.com/{{ repo }}"
 
+[project.scripts]
+# The deploy workflow runs this command: `{{ slug }} deploy` and `{{ slug }} social`.
+{{ slug }} = "{{ package }}.cli:main"
+
 [dependency-groups]
 dev = [
     "diff-cover>=9.2",

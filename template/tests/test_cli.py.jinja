@@ -1,0 +1,24 @@
+"""The project's command line, which the deploy workflow runs."""
+
+from click.testing import CliRunner
+from labinacan.errors import SyncError
+
+from {{ package }}.cli import main
+
+R2 = ("CF_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
+
+
+def test_the_command_line_has_the_sites_deploy_and_social_commands():
+    result = CliRunner().invoke(main, ["--help"])
+    assert result.exit_code == 0
+    assert "deploy" in result.output and "social" in result.output
+
+
+def test_a_deploy_with_no_r2_credentials_names_the_missing_ones(tmp_path, monkeypatch):
+    for name in R2:
+        monkeypatch.delenv(name, raising=False)
+    (tmp_path / "index.html").write_text("<p>a page</p>")
+    args = ["deploy", "--dist-dir", str(tmp_path), "--bucket", "b", "--dry-run"]
+    result = CliRunner().invoke(main, args)
+    assert isinstance(result.exception, SyncError)
+    assert all(name in str(result.exception) for name in R2)
