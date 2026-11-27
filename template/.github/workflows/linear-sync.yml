@@ -40,7 +40,8 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GH_TOKEN: ${{ github.token }}
-          # A user-owned project needs a token with the `project` scope.
+          # A user-owned project needs a classic token with the `project` scope, and also
+          # `repo` when the repository is private: without it the token can't see the issues.
           # GITHUB_TOKEN can't write to it. Without this secret the job skips the Roadmap.
           ROADMAP_TOKEN: ${{ secrets.ROADMAP_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}

@@ -46,7 +46,7 @@ LABELS = {
 # The secrets that the workflows read (.github/workflows), and what each one is for.
 SECRETS = {
     "LINEAR_API_KEY": "the two-way sync of issues with Linear",
-    "ROADMAP_TOKEN": "the Roadmap's Priority field ([tool.labinacan] roadmap_project names it)",
+    "ROADMAP_TOKEN": "the Roadmap's Priority field (a classic token: project, and repo if private)",
     "HF_TOKEN": "the link check, which reads from Hugging Face (a read-only token)",
 }
 
