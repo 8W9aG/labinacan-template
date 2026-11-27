@@ -15,7 +15,7 @@ The template of an agent-run research project. A new project gets a site, papers
    - the project's name, its package, its description and the maintainer's GitHub login;
    - the repository, the site's address, the Linear team and the Hugging Face dataset;
    - the brand's colours and the site's accent;
-   - whether to publish the package to PyPI, and whether Zenodo archives each release (default: yes to both). A local project answers no: it gets no publish workflow, and the release skill skips the PyPI and Zenodo steps;
+   - whether to publish the package to PyPI, whether Zenodo archives each release, and whether papers go to the alphaXiv AI Track (default: yes to all three). A local project answers no. Without PyPI it gets no publish workflow. Without Zenodo it gets no `CITATION.cff`: each paper keeps its metadata in `paper.yml`. Without alphaXiv it gets no `scripts/submit_paper.py`. The skills leave out the steps that are off;
    - whether to keep the example paper, post and literature review (default: no). Without them, `papers/`, `posts/` and `docs/literature/` start empty, and every check still passes.
 
    The answers write `pyproject.toml`, the `Makefile`, the README and the citations. `--trust` lets copier run the setup task, `scripts/setup_repo.py`. The task draws the brand. It creates the issue labels and sets the repository's description and homepage with `gh`. Then it lists what is left, such as the secrets to set.

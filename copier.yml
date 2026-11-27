@@ -132,6 +132,13 @@ zenodo:
     doesn't check for a Zenodo record. Zenodo can't archive a private repository
   default: true
 
+alphaxiv:
+  type: bool
+  help: >-
+    Post each published paper to the alphaXiv AI Track? Without it the project has no
+    scripts/submit_paper.py and no muse-label workflow
+  default: true
+
 github_setup:
   type: bool
   help: >-

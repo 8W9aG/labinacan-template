@@ -1,6 +1,7 @@
 """The references and the structure of the papers in papers/."""
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -168,9 +169,12 @@ def test_a_new_uncovered_reference_and_a_stale_line_both_fail(tmp_path):
     ]
 
 
-@pytest.mark.parametrize("paper", sorted(p.parent.name for p in PAPERS.glob("*/CITATION.cff")))
+@pytest.mark.parametrize(
+    "paper", sorted(p.parent.name for p in PAPERS.glob(f"*/{config().paper_meta}"))
+)
 def test_every_paper_names_the_maintainer_first(paper):
     # The maintainer is the first author of every paper, and the group the second (#5260).
-    root = yaml.safe_load((PAPERS.parent / "CITATION.cff").read_text(encoding="utf-8"))
-    cff = yaml.safe_load((PAPERS / paper / "CITATION.cff").read_text(encoding="utf-8"))
-    assert cff["authors"] == [*root["authors"], {"name": config().name}]
+    project = tomllib.loads((PAPERS.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    people = [{"name": a["name"]} for a in project["project"]["authors"]]
+    meta = (PAPERS / paper / config().paper_meta).read_text(encoding="utf-8")
+    assert yaml.safe_load(meta)["authors"] == [*people, {"name": config().name}]

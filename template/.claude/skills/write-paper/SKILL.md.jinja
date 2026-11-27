@@ -22,7 +22,7 @@ List the paper in `papers/README.md`, with the date it is published before it: `
 
 ## Authors
 
-`project.md` names the authors of every paper. `scripts/papers.py` writes them into each paper's `CITATION.cff`, and takes the maintainer's name from the root `CITATION.cff`. The site shows them under the title. Never add an agent or a model as an author. Say in the paper's text which models proposed, reviewed, wrote and narrated the work.
+`project.md` names the authors of every paper. `scripts/papers.py` writes them into each paper's `{{ 'CITATION.cff' if zenodo else 'paper.yml' }}`, and takes the maintainer's name from `[project] authors` in `pyproject.toml`. The site shows them under the title. Never add an agent or a model as an author. Say in the paper's text which models proposed, reviewed, wrote and narrated the work.
 
 ## Structure
 
@@ -133,12 +133,12 @@ The maintainer decided on 2026-11-17 that every paper is either a **preprint** o
   ```bash
   uv run python scripts/papers.py new <slug> --work "#N (what is left)."
   ```
-  This also writes its `CITATION.cff`. When an issue on the paper closes, take it off the line in the PR that closes it. Name any follow-up issue that changes the paper. CI fails that PR if the line still names the issue (`scripts/papers.py check --closing`). A nightly run fails if a line names an issue closed some other way (`check --online`, #5395).
+  This also writes its `{{ 'CITATION.cff' if zenodo else 'paper.yml' }}`. When an issue on the paper closes, take it off the line in the PR that closes it. Name any follow-up issue that changes the paper. CI fails that PR if the line still names the issue (`scripts/papers.py check --closing`). A nightly run fails if a line names an issue closed some other way (`check --online`, #5395).
 - **Publish it when no work on it is left**, in the PR that closes its last issue:
   ```bash
   uv run python scripts/papers.py publish <slug>
   ```
-  The line then gives the date, and `CITATION.cff` holds the SHA-256 of the text and the results files. The next release opens an issue for Muse to post it to the alphaXiv AI Track (the `release` skill's `project.md`, *Before the release*, #5259).
+  The line then gives the date, and `{{ 'CITATION.cff' if zenodo else 'paper.yml' }}` holds the SHA-256 of the text and the results files.{% if alphaxiv %} The next release opens an issue for Muse to post it to the alphaXiv AI Track (`scripts/submit_paper.py submit <slug> --issue`, #5259).{% endif %}
 - **A published paper doesn't change.** A later correction goes in a `## Addenda` section at the end, one dated `### YYYY-MM-DD` entry each. New work becomes a new paper that cites it. `make lint` (`scripts/papers.py check`) fails if the text above the addenda, or a results file, changes.
 
 ## Before you finish
