@@ -5,7 +5,6 @@ scripts/check_line_limit.py::function_lengths.visit
 scripts/check_site_links.py::broken_links
 scripts/exchange.py::main
 scripts/issue_state.py::milestone_issues
-scripts/linear_sync.py::roadmap
 scripts/linear_sync.py::main
 scripts/next_issue.py::set_priority
 scripts/next_issue.py::main

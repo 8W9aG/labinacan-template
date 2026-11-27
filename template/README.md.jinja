@@ -51,6 +51,8 @@ copier merges each later change of the template into this project, and keeps the
 
 `auto_merge_rule` is optional. It names a function, as `"path.py:function"`, that takes one file's name. A pull request from anyone that only adds files that the function accepts merges by itself once CI passes. With no rule, only the maintainer's and Dependabot's pull requests merge by themselves (`.github/workflows/auto-merge.yml`).
 
+`roadmap_project` is optional. It is the number of the maintainer's GitHub project that is the Roadmap, which `scripts/linear_sync.py` keeps in step with Linear when `ROADMAP_TOKEN` is set. With no number, the sync skips the Roadmap.
+
 `[tool.labinacan.brand]` draws the mark, the logo and the social card, and gives the site's accent. After a change, draw them again with `uv run python scripts/brand_images.py`. `[tool.labinacan.size_budget]`, `[tool.labinacan.exchange]` and `[tool.labinacan.breaking]` are optional.
 
 ## Layout
