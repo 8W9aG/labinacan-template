@@ -10,8 +10,11 @@ name: Auto-merge
 #   (#6992). It takes one file's name and returns true when a PR from anyone may add it,
 #   for example a record that CI measures again. A project with no rule has only the two
 #   rules above. A PR with more files than the files API lists (3,000) never qualifies.
-# GitHub then merges once the required checks pass on the head commit. Any other PR is
-# left for a human, and auto-merge is turned off if an earlier push had turned it on.
+# Before it merges, the job waits for every pull_request run on the PR's head commit to
+# finish, and merges only if each one passed. A repository with required checks would wait
+# for them anyway. A private repository on GitHub's free plan can have none, and there
+# --auto merged at once, before CI (open-familyoffice#44). Any other PR is left for a
+# human, and auto-merge is turned off if an earlier push had turned it on.
 # This file holds no value of a project (#6992).
 #
 # pull_request_target runs this file from main with a write token, also for fork PRs, so
@@ -32,10 +35,11 @@ jobs:
       group: auto-merge-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # the wait for CI gives up after 45 minutes
     permissions:
       contents: write
       pull-requests: write
-      actions: read  # the wait for CI after a PR leaves draft lists its runs
+      actions: read  # the waits for CI list the PR's runs
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -93,19 +97,51 @@ jobs:
       - name: Auto-merge if the maintainer opened it, or it only adds files the rule accepts
         run: |
           set -euo pipefail
+          # Merge once every pull_request run on the head commit has passed. This job's own
+          # run is a pull_request_target run, so it isn't counted. A new push cancels this job
+          # (the concurrency group), and --match-head-commit refuses a commit that moved on.
+          merge_after_ci() {
+            local runs="repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request"
+            local state=none passes=0
+            # A run can register a little after the others, so "passed" must hold twice.
+            for _ in $(seq 1 135); do  # 45 minutes
+              state=$(gh api "$runs&per_page=100" --jq '[.workflow_runs[]]
+                | if length == 0 then "none"
+                  elif any(.status != "completed") then "running"
+                  elif all(.conclusion == "success" or .conclusion == "skipped"
+                    or .conclusion == "neutral") then "passed"
+                  else "failed" end')
+              if [ "$state" = failed ]; then
+                break
+              elif [ "$state" = passed ]; then
+                passes=$((passes + 1))
+                if [ "$passes" -ge 2 ]; then
+                  break
+                fi
+              else
+                passes=0
+              fi
+              sleep 20
+            done
+            if [ "$state" != passed ]; then
+              echo "Not merged: CI on $HEAD_SHA is $state. Left for review." \
+                >> "$GITHUB_STEP_SUMMARY"
+              return 0
+            fi
+            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
+            echo "Merged after CI passed: $1" >> "$GITHUB_STEP_SUMMARY"
+          }
           # A fork's branch can be pushed by someone else, so only this repo's branches count.
           # The PR's author never changes, so the account that pushed must be the maintainer.
           if [ "$AUTHOR" = "$MAINTAINER" ] && [ "$SENDER" = "$MAINTAINER" ] \
             && [ "$HEAD_REPO" = "$REPO" ]; then
-            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
-            echo "Auto-merge on: opened by $MAINTAINER." >> "$GITHUB_STEP_SUMMARY"
+            merge_after_ci "opened by $MAINTAINER."
             exit 0
           fi
           # Dependabot's updates, when Dependabot also pushed the head.
           if [ "$AUTHOR" = "$DEPENDABOT" ] && [ "$SENDER" = "$DEPENDABOT" ] \
             && [ "$HEAD_REPO" = "$REPO" ]; then
-            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
-            echo "Auto-merge on: a Dependabot update." >> "$GITHUB_STEP_SUMMARY"
+            merge_after_ci "a Dependabot update."
             exit 0
           fi
           # A rename lists its old path too, so the rule judges the file's old place as well.
@@ -142,8 +178,7 @@ jobs:
           PY
           then
             # --match-head-commit: never auto-merge a commit whose files weren't listed.
-            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
-            echo "Auto-merge on: it only adds files the rule accepts." >> "$GITHUB_STEP_SUMMARY"
+            merge_after_ci "it only adds files the rule accepts."
           else
             if [ "$(gh pr view "$PR" --repo "$REPO" --json autoMergeRequest \
                   -q '.autoMergeRequest != null')" = true ]; then
