@@ -28,6 +28,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
       - name: Move
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -40,4 +44,5 @@ jobs:
             echo "::notice::No LINEAR_API_KEY: no issue to move."
             exit 0
           fi
-          python3 scripts/issue_state.py --release "$TAG" $DRY_RUN
+          # uv installs the locked dependencies: the script imports labinacan.
+          uv run --frozen --no-dev python scripts/issue_state.py --release "$TAG" $DRY_RUN

@@ -32,6 +32,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
       - name: Sync
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -39,10 +43,12 @@ jobs:
           # A user-owned project needs a token with the `project` scope.
           # GITHUB_TOKEN can't write to it. Without this secret the job skips the Roadmap.
           ROADMAP_TOKEN: ${{ secrets.ROADMAP_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
         # A project with no Linear workspace has no key, and the job has nothing to sync.
         run: |
           if [ -z "$LINEAR_API_KEY" ]; then
             echo "::notice::No LINEAR_API_KEY: nothing to sync."
             exit 0
           fi
-          python3 scripts/linear_sync.py ${{ inputs.dry_run && '--dry-run' || '' }}
+          # uv installs the locked dependencies: the script imports labinacan.
+          uv run --frozen --no-dev python scripts/linear_sync.py $DRY_RUN
