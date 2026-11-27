@@ -93,8 +93,19 @@ jobs:
           make lint
           make coverage COVERAGE_BASE=HEAD
           make mutation
-          make build
+          # What the copy's deploy.yml runs before it syncs (#6992). With no R2 bucket, the
+          # deploy stops after these.
+          make deploy-prepare
+          make build BUILD_WRAPPER="scripts/capped.sh 6G 4G --"
           test -f dist/index.html && test -f dist/assets/mark.svg
+      - name: The copy's deploy and auto-merge workflows pass actionlint
+        # These two run only from a default branch, so no pull request runs them. actionlint
+        # checks their syntax, expressions and shell scripts. The other workflows run on pull
+        # requests, so a pull request tests them.
+        working-directory: ${{ runner.temp }}/project
+        run: |
+          uvx --from actionlint-py==1.7.12.25 actionlint \
+            .github/workflows/deploy.yml .github/workflows/auto-merge.yml
 
   update:
     name: copier update takes a later change
