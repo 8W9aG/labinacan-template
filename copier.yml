@@ -111,6 +111,13 @@ accent:
   choices: [teal, sky, indigo, emerald, rose, amber]
   default: teal
 
+examples:
+  type: bool
+  help: >-
+    Keep the example paper, post and literature review? They show the forms. Without them
+    the project starts with empty papers/, posts/ and docs/literature/
+  default: false
+
 github_setup:
   type: bool
   help: >-

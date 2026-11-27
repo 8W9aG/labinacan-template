@@ -7,9 +7,10 @@ The statuses:
 - **used**: code, a skill or a rule depends on it.
 - **planned**: an open issue would use it.
 - **not applicable**: reviewed, and the project has no use for it.
-
+{% if examples %}
 ## Releases
 
 | Page | Status | Why |
 | --- | --- | --- |
 | [Semantic Versioning 2.0.0](semantic-versioning.md) (Preston-Werner, 2013) | used | The release's version rule. `scripts/changelog.py next` bumps the minor number for a breaking change while the version is 0.y.z, as the specification allows. |
+{% endif %}
