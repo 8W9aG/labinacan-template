@@ -139,8 +139,12 @@ def test_the_muse_check_exits_1_for_an_issue_that_may_not_have_the_label(monkeyp
     assert f"#7: NOT eligible (opened by {OUT}, with no thumbs up from {M})" in out
 
 
+MUSE_WORKFLOW = Path(__file__).parents[1] / ".github/workflows/muse-label.yml"
+
+
+@pytest.mark.skipif(not MUSE_WORKFLOW.exists(), reason="no alphaXiv, so no muse-label workflow")
 def test_the_muse_label_workflow_runs_the_check_on_labelled_issues():
-    text = (Path(__file__).parents[1] / ".github/workflows/muse-label.yml").read_text()
+    text = MUSE_WORKFLOW.read_text()
     assert '--muse-check "$NUMBER"' in text and "--remove-label muse" in text
     assert "contains(github.event.issue.labels.*.name, 'muse')" in text
 

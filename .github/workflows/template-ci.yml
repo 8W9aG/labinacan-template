@@ -27,7 +27,7 @@ jobs:
         include:
           - name: A default copy passes its checks
             answers: ""
-            publishes: true
+            optional: true  # each optional file is there
           # Every name differs from the default, and the examples stay, so that no check
           # leans on a default value or on an empty papers/ folder.
           - name: A copy with other answers and the examples passes its checks
@@ -35,10 +35,10 @@ jobs:
               -d examples=true -d "name=River Survey" -d slug=river-survey
               -d package=riversurvey -d env_prefix=RIVER -d maintainer=river-lab
               -d accent=rose -d site_url=https://rivers.example.org/
-              -d pypi=false -d zenodo=false
+              -d pypi=false -d zenodo=false -d alphaxiv=false
               -d "description=A survey of the rivers of one region, over many years and
               seasons, with gauges, satellites and a variety of other methods"
-            publishes: false
+            optional: false  # no optional file is there
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -56,17 +56,22 @@ jobs:
           git init --quiet
           git add -A
           git -c user.name=ci -c user.email=ci@example.org commit --quiet -m "copier copy"
-      - name: The copy has the publish workflow only when it publishes to PyPI
+      - name: The copy has each optional file only when its answer is yes
+        # pypi: publish.yml. zenodo: the root CITATION.cff. alphaxiv: muse-label.yml and
+        # submit_paper.py.
         working-directory: ${{ runner.temp }}/project
         env:
-          PUBLISHES: ${{ matrix.publishes }}
+          OPTIONAL: ${{ matrix.optional }}
         run: |
-          has=false
-          if [ -e .github/workflows/publish.yml ]; then has=true; fi
-          if [ "$has" != "$PUBLISHES" ]; then
-            echo "::error::publish.yml is there: $has. The answers want: $PUBLISHES"
-            exit 1
-          fi
+          for file in .github/workflows/publish.yml CITATION.cff \
+              .github/workflows/muse-label.yml scripts/submit_paper.py; do
+            has=false
+            if [ -e "$file" ]; then has=true; fi
+            if [ "$has" != "$OPTIONAL" ]; then
+              echo "::error::$file is there: $has. The answers want: $OPTIONAL"
+              exit 1
+            fi
+          done
       - name: Install the copy's dependencies (its scripts/ci-install.sh)
         working-directory: ${{ runner.temp }}/project
         run: |

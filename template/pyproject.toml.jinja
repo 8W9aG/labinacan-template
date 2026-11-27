@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     # The site, papers, posts and brand, from PyPI (8W9aG/labinacan). `copier update`
     # moves this pin when the template moves to a new release.
-    "labinacan[r2,pii]==0.1.1",
+    "labinacan[r2,pii]==0.1.5",
 ]
 
 [project.urls]
@@ -72,6 +72,9 @@ env_prefix = "{{ env_prefix }}"
 linear_team = "{{ linear_team }}"
 maintainer = "{{ maintainer }}"
 hf_dataset = "{{ hf_dataset }}"
+{%- if not zenodo %}
+paper_meta = "paper.yml"  # each paper's metadata, with no citation file (no Zenodo)
+{%- endif %}
 generated = []
 data_only = []
 automatic_issue_workflows = []
