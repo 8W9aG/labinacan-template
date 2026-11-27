@@ -1,5 +1,6 @@
-# The template's CI (8W9aG/openinterpretability#7002). It copies the project with copier's
-# default answers and runs the project's own checks on the copy, as its first push would.
+# The template's CI (8W9aG/openinterpretability#7002, #6999). It copies the project twice:
+# with copier's default answers, which leave out the examples, and with other answers that keep
+# them. It runs the project's own checks on each copy, as its first push would.
 # Then it checks that `copier update` takes a later change of the template cleanly.
 name: Template CI
 
@@ -17,19 +18,35 @@ env:
 
 jobs:
   copy:
-    name: A default copy passes its checks
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: A default copy passes its checks
+            answers: ""
+          # Every name differs from the default, and the examples stay, so that no check
+          # leans on a default value or on an empty papers/ folder.
+          - name: A copy with other answers and the examples passes its checks
+            answers: >-
+              -d examples=true -d "name=River Survey" -d slug=river-survey
+              -d package=riversurvey -d env_prefix=RIVER -d maintainer=river-lab
+              -d accent=rose -d site_url=https://rivers.example.org/
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0  # copier reads the template's commits
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
-      - name: Copy the project with the default answers
+      - name: Copy the project with the job's answers
         # github_setup=false: CI changes no repository. The task still draws the brand.
+        env:
+          ANSWERS: ${{ matrix.answers }}
         run: |
-          uvx "$COPIER" copy --defaults --trust -d github_setup=false --vcs-ref HEAD \
-            . "$RUNNER_TEMP/project"
+          eval "args=($ANSWERS)"  # the answers hold quoted values with spaces
+          uvx "$COPIER" copy --defaults --trust -d github_setup=false "${args[@]}" \
+            --vcs-ref HEAD . "$RUNNER_TEMP/project"
           cd "$RUNNER_TEMP/project"
           git init --quiet
           git add -A
