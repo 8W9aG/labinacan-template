@@ -3,7 +3,8 @@
 The packages are ``[tool.mutmut] source_paths``, the list that mutmut itself copies. The
 large folders that no unit test reads are ``[tool.labinacan] mutation_skip``. The files
 that a tool writes, which the checks of hand-written files skip, are ``[tool.labinacan]
-generated``. So no script names a package, a folder or a file of a project.
+generated``. The GitHub project of the Roadmap is ``[tool.labinacan] roadmap_project``.
+So no script names a package, a folder, a file or a project board of a project.
 """
 
 from __future__ import annotations
@@ -97,6 +98,23 @@ def generated(root: Path = Path(".")) -> tuple[str, ...]:
         True
     """
     return tuple(_tables(root)[1].get("generated", ()))
+
+
+def roadmap_project(root: Path = Path(".")) -> int | None:
+    """The number of the maintainer's GitHub project that is the Roadmap, or None.
+
+    ``[tool.labinacan] roadmap_project`` gives it. A project with no Roadmap gives none, and
+    ``scripts/linear_sync.py`` then skips the Roadmap, also when ``ROADMAP_TOKEN`` is set.
+
+    Args:
+        root: The repository's root.
+
+    Returns:
+        The project's number, or None.
+
+    """
+    number = _tables(root)[1].get("roadmap_project")
+    return int(number) if number else None
 
 
 def automatic_workflows(root: Path = Path(".")) -> tuple[str, ...]:

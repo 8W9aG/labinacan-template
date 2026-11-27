@@ -136,3 +136,10 @@ def test_sync_relations_dry_run_prints_and_changes_nothing(monkeypatch, capsys):
     monkeypatch.setattr(linear_sync, "github_graphql", lambda q, t, **v: calls.append(v))
     linear_sync.sync_relations(dry=False)
     assert calls == [{"i": "GA", "b": "GB"}]
+
+
+def test_the_roadmap_needs_both_a_project_number_and_a_token():
+    # A project with no roadmap_project never touches a board, even with a token.
+    assert linear_sync.roadmap_token({"ROADMAP_TOKEN": "t"}, 3) == "t"
+    assert linear_sync.roadmap_token({"ROADMAP_TOKEN": "t"}, None) is None
+    assert linear_sync.roadmap_token({}, 3) is None

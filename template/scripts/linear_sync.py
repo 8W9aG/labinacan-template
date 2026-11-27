@@ -27,7 +27,9 @@ The workflow `.github/workflows/linear-sync.yml` runs it every hour. Run it by
 hand with `--dry-run` to print the changes without making them.
 
 Environment: LINEAR_API_KEY, GH_TOKEN (labels), ROADMAP_TOKEN (the Roadmap project;
-without it, the script skips the Roadmap).
+without it, the script skips the Roadmap). The Roadmap is the maintainer's GitHub
+project that ``[tool.labinacan] roadmap_project`` names. With no such number, the script
+skips the Roadmap too.
 """
 
 from __future__ import annotations
@@ -43,10 +45,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import issue_state  # noqa: E402
+import repo_config  # noqa: E402
 
 REPO = issue_state.REPO
 ROADMAP_OWNER = issue_state.MAINTAINER
-ROADMAP_NUMBER = 2
+ROADMAP_NUMBER = repo_config.roadmap_project(Path(__file__).resolve().parents[1])
 LINEAR_API = "https://api.linear.app/graphql"
 PRIORITY_LABEL = "priority: "
 # Linear's priority numbers. 0 means no priority.
@@ -269,16 +272,9 @@ def roadmap(token: str) -> tuple[dict, dict[str, dict]]:
     """Return the Roadmap (ID and single-select fields) and its items by issue URL."""
     items, after, meta = {}, "", {}
     while True:
-        args = [
-            "api",
-            "graphql",
-            "-f",
-            f"query={ROADMAP}",
-            "-f",
-            f"owner={ROADMAP_OWNER}",
-            "-F",
-            f"number={ROADMAP_NUMBER}",
-        ] + (["-f", f"after={after}"] if after else [])
+        args = ["api", "graphql", "-f", f"query={ROADMAP}", "-f", f"owner={ROADMAP_OWNER}",
+                "-F", f"number={ROADMAP_NUMBER}"]  # fmt: skip
+        args += ["-f", f"after={after}"] if after else []
         proj = json.loads(gh(*args, token=token))["data"]["user"]["projectV2"]
         fields = {f["name"]: f for f in proj["fields"]["nodes"] if f}
         meta = {"id": proj["id"], "fields": fields}
@@ -455,12 +451,22 @@ def sync_relations(dry: bool) -> int:
     return len(changes)
 
 
+def roadmap_token(env: dict, number: int | None) -> str | None:
+    """The token for the Roadmap, or None when the project has no Roadmap or no token.
+
+    Args:
+        env: The environment, which may hold ``ROADMAP_TOKEN``.
+        number: The Roadmap's project number (:data:`ROADMAP_NUMBER`), or None.
+    """
+    return env.get("ROADMAP_TOKEN") if number else None
+
+
 def main() -> None:
     """Plan and apply the changes for every issue that Linear links to GitHub."""
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--dry-run", action="store_true", help="print the changes and make none")
     dry = ap.parse_args().dry_run
-    token = os.environ.get("ROADMAP_TOKEN")
+    token = roadmap_token(dict(os.environ), ROADMAP_NUMBER)
     issues, meta = collect(token)
     options = meta.get("fields", {}).get("Workstream", {}).get("options", [])
     workstreams = {o["name"] for o in options}
