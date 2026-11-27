@@ -49,6 +49,8 @@ copier merges each later change of the template into this project, and keeps the
 | `data_only` | the folders whose changes alone run no lint and tests |
 | `automatic_issue_workflows` | the workflows whose failure issues an agent may work |
 
+`auto_merge_rule` is optional. It names a function, as `"path.py:function"`, that takes one file's name. A pull request from anyone that only adds files that the function accepts merges by itself once CI passes. With no rule, only the maintainer's and Dependabot's pull requests merge by themselves (`.github/workflows/auto-merge.yml`).
+
 `[tool.labinacan.brand]` draws the mark, the logo and the social card, and gives the site's accent. After a change, draw them again with `uv run python scripts/brand_images.py`. `[tool.labinacan.size_budget]`, `[tool.labinacan.exchange]` and `[tool.labinacan.breaking]` are optional.
 
 ## Layout
@@ -59,7 +61,9 @@ copier merges each later change of the template into this project, and keeps the
 | `labinacan.mk` | the Make targets that the `Makefile` includes |
 | `scripts/` | the checks of code and prose, the changelog, mutation testing, the issue loop and Linear sync |
 | `.claude/skills/` | the skills that agents follow |
-| `.github/workflows/` | CI, the secret scan, the link check, publishing and issue syncs |
+| `.github/workflows/` | CI, the secret scan, the link check, auto-merge, the deploy, publishing and issue syncs |
+
+The deploy (`.github/workflows/deploy.yml`) builds the site on each push to `main`. It syncs the site to Cloudflare R2 and posts new papers to X only when the repository variable `R2_BUCKET` is set. The project's own steps before the build go in a Make target that `DEPLOY_PREPARE` names.
 | `papers/`, `posts/`, `docs/literature/` | the project's content |
 
 ## Licence

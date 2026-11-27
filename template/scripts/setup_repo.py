@@ -40,6 +40,7 @@ LABELS = {
     "area: literature": ("5319E7", "A review of a paper or post"),
     "area: papers": ("0E8A16", "A paper, its figures and references"),
     "area: site": ("006B75", "The built site"),
+    "area: pipeline": ("FBCA04", "The deploy and other workflows"),
 }
 
 # The secrets that the workflows read (.github/workflows), and what each one is for.

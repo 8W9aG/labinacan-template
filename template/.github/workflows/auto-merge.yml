@@ -1,0 +1,175 @@
+name: Auto-merge
+
+# Turns on GitHub's auto-merge (squash) for three kinds of pull request:
+# - one that the maintainer opened from a branch of this repository, whatever it changes,
+#   when the maintainer also made the event: the push (synchronize) or the reopen. The
+#   maintainer is the repository's owner.
+# - one that Dependabot opened and pushed, from a branch of this repository.
+# - one that only adds files that the project's own rule accepts. The rule is a function
+#   that `[tool.labinacan] auto_merge_rule` in pyproject.toml names, as "path.py:function"
+#   (#6992). It takes one file's name and returns true when a PR from anyone may add it,
+#   for example a record that CI measures again. A project with no rule has only the two
+#   rules above. A PR with more files than the files API lists (3,000) never qualifies.
+# GitHub then merges once the required checks pass on the head commit. Any other PR is
+# left for a human, and auto-merge is turned off if an earlier push had turned it on.
+# This file holds no value of a project (#6992).
+#
+# pull_request_target runs this file from main with a write token, also for fork PRs, so
+# it must never check out or run the PR's code: it reads the PR's file list through the
+# API and nothing else. Same rule as land-experiment's step 7.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+
+permissions: {}
+
+jobs:
+  enable:
+    name: Enable auto-merge
+    if: github.event.action != 'closed' && !github.event.pull_request.draft
+    concurrency:
+      group: auto-merge-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read  # the wait for CI after a PR leaves draft lists its runs
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      # Who made this event: for synchronize, the account that pushed the new head.
+      SENDER: ${{ github.event.sender.login }}
+      HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      # Agents that run under the maintainer's GitHub login open PRs as the maintainer too.
+      MAINTAINER: ${{ github.repository_owner }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      DEPENDABOT: dependabot[bot]
+      # The files API lists at most this many files of a PR.
+      MAX_LISTED: 3000
+    steps:
+      # The project's rule and its file, read from the base commit through the API. This job
+      # checks out nothing and runs none of the PR's code.
+      - name: Read the project's rule from the base commit
+        run: |
+          set -euo pipefail
+          mkdir -p rule
+          gh api "repos/$REPO/contents/pyproject.toml?ref=$BASE_SHA" \
+            -H "Accept: application/vnd.github.raw" > rule/pyproject.toml
+          rule=$(python3 -c 'import sys, tomllib
+          own = tomllib.load(open(sys.argv[1], "rb")).get("tool", {}).get("labinacan", {})
+          print(own.get("auto_merge_rule", ""))' rule/pyproject.toml)
+          if [ -n "$rule" ]; then
+            gh api "repos/$REPO/contents/${rule%%:*}?ref=$BASE_SHA" \
+              -H "Accept: application/vnd.github.raw" > rule/rule.py
+            echo "RULE_FUNCTION=${rule##*:}" >> "$GITHUB_ENV"
+          fi
+      # A draft's CI run skips every job, and a skipped job reports success (#4690). So when a
+      # PR leaves draft, the required checks still show the draft run's skipped results until
+      # the new run registers its own. This waits for every pull_request run that leaving
+      # draft starts to finish, so auto-merge never turns on while the stale results stand.
+      - name: Wait for the CI run that leaving draft starts
+        if: github.event.action == 'ready_for_review'
+        env:
+          SINCE: ${{ github.event.pull_request.updated_at }}
+        run: |
+          since=$(date -d "$SINCE" +%s)  # the runs that leaving draft starts are newer
+          runs="repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=100"
+          query="[.workflow_runs[] | select((.created_at | fromdateiso8601) >= $since)]"
+          for _ in $(seq 1 90); do
+            # Wait until the new runs exist and none of them is still going.
+            state=$(gh api "$runs" --jq "$query | if length == 0 then \"none\"
+              elif all(.status == \"completed\") then \"completed\" else \"running\" end")
+            [ "$state" = completed ] && exit 0
+            sleep 20
+          done
+          echo "The CI runs for $HEAD_SHA did not finish in 30 minutes."
+          echo "So auto-merge stays off."
+          exit 1
+      - name: Auto-merge if the maintainer opened it, or it only adds files the rule accepts
+        run: |
+          set -euo pipefail
+          # A fork's branch can be pushed by someone else, so only this repo's branches count.
+          # The PR's author never changes, so the account that pushed must be the maintainer.
+          if [ "$AUTHOR" = "$MAINTAINER" ] && [ "$SENDER" = "$MAINTAINER" ] \
+            && [ "$HEAD_REPO" = "$REPO" ]; then
+            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
+            echo "Auto-merge on: opened by $MAINTAINER." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Dependabot's updates, when Dependabot also pushed the head.
+          if [ "$AUTHOR" = "$DEPENDABOT" ] && [ "$SENDER" = "$DEPENDABOT" ] \
+            && [ "$HEAD_REPO" = "$REPO" ]; then
+            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
+            echo "Auto-merge on: a Dependabot update." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # A rename lists its old path too, so the rule judges the file's old place as well.
+          gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
+          # Someone else's PR may only add files. An edit to an existing page (its
+          # Discussion, say) waits for a person, since agents later read those pages.
+          gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | select(.status != "added") | .filename' > changed.txt
+          # A PR with more files than the API lists could hide a change past the list's end.
+          total=$(gh pr view "$PR" --repo "$REPO" --json changedFiles -q .changedFiles)
+          : > outside.txt
+          if [ "$total" -gt "$MAX_LISTED" ]; then
+            echo "more than $MAX_LISTED files" > outside.txt
+          fi
+          # With no rule, no file qualifies.
+          if [ -z "${RULE_FUNCTION:-}" ]; then
+            echo "the project has no auto_merge_rule" >> outside.txt
+          fi
+          if [ -s files.txt ] && [ ! -s changed.txt ] && [ ! -s outside.txt ] \
+            && ! python3 - files.txt > outside.txt <<'PY'
+          import importlib.util
+          import os
+          import sys
+          spec = importlib.util.spec_from_file_location("rule", "rule/rule.py")
+          module = importlib.util.module_from_spec(spec)
+          sys.modules["rule"] = module  # a dataclass in the file looks its module up
+          spec.loader.exec_module(module)
+          accepts = getattr(module, os.environ["RULE_FUNCTION"])
+          # One name per line, as the API lists them: a name is checked whole, never split.
+          outside = [f for f in open(sys.argv[1]).read().splitlines() if f and not accepts(f)]
+          print("\n".join(outside))
+          sys.exit(0 if outside else 1)
+          PY
+          then
+            # --match-head-commit: never auto-merge a commit whose files weren't listed.
+            gh pr merge "$PR" --repo "$REPO" --auto --squash --match-head-commit "$HEAD_SHA"
+            echo "Auto-merge on: it only adds files the rule accepts." >> "$GITHUB_STEP_SUMMARY"
+          else
+            if [ "$(gh pr view "$PR" --repo "$REPO" --json autoMergeRequest \
+                  -q '.autoMergeRequest != null')" = true ]; then
+              gh pr merge "$PR" --repo "$REPO" --disable-auto
+            fi
+            {
+              echo "Left for review: files the rule doesn't accept, or edits to existing files."
+              echo
+              # The backticks are Markdown for the summary, not a command.
+              # shellcheck disable=SC2016
+              cat outside.txt changed.txt | sed 's/^/- `/; s/$/`/'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    name: Deploy after auto-merge
+    # Meant to deploy after a merge made with the workflow token, which starts no push
+    # workflow. But that merge starts no "closed" event either, so this job doesn't run
+    # for it (issue #3989). Deploy's 30-minute schedule catches those merges instead.
+    if: >-
+      github.event.action == 'closed' && github.event.pull_request.merged &&
+      github.event.pull_request.merged_by.login == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: gh workflow run deploy.yml --repo "${{ github.repository }}" --ref main
