@@ -1,0 +1,26 @@
+{
+ "model": "sentence-transformers/all-MiniLM-L6-v2",
+ "layout": "umap seed 4577",
+ "compactness": 1.0,
+ "regions": [
+  {
+   "number": 1,
+   "name": "Releases",
+   "x": 0.5,
+   "y": 0.5,
+   "size": 1,
+   "touches": {}
+  }
+ ],
+ "reviews": [
+  {
+   "name": "semantic-versioning",
+   "x": 0.5,
+   "y": 0.5,
+   "sha256": "04822773224715ff9ccc20180bc4c1aa6b489acd7b04715eb9e97c1c28161d8e",
+   "region": 1,
+   "neighbours": []
+  }
+ ],
+ "queued": []
+}

@@ -26,8 +26,13 @@ classifiers = [
 dependencies = [
     # The site, papers, posts and brand, from PyPI (8W9aG/labinacan). `copier update`
     # moves this pin when the template moves to a new release.
-    "labinacan[r2,pii]==0.1.5",
+    "labinacan[r2,pii]==0.1.8",
 ]
+
+[project.optional-dependencies]
+# The literature map's generator (`uv run --extra map python -m labinacan.literature_map`).
+# Its libraries are heavy, so only a map run installs them. The version is the pin above.
+map = ["labinacan[map]"]
 
 [project.urls]
 Homepage = "{{ site_url }}"
