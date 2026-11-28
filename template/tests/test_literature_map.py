@@ -9,4 +9,5 @@ ROOT = Path(__file__).parents[1]
 
 def test_every_review_is_on_the_map():
     missing = missing_from_map(ROOT)
-    assert missing == [], f"not on docs/literature/map.json, run uv run --extra map {COMMAND}: {missing}"
+    hint = f"run uv run --extra map {COMMAND}"
+    assert missing == [], f"not on docs/literature/map.json, {hint}: {missing}"
